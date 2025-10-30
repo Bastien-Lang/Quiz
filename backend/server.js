@@ -1,36 +1,45 @@
 import express from "express";
-import http from "http";
-import { Server } from "socket.io";
 import cors from "cors";
-import dotenv from "dotenv";
+import { PrismaClient } from "@prisma/client";
 
-dotenv.config();
 const app = express();
+const prisma = new PrismaClient();
+
 app.use(cors());
 app.use(express.json());
 
-// Serveur HTTP + WebSocket
-const server = http.createServer(app);
-const io = new Server(server, {
-  cors: { origin: "*" }
+// ✅ Route test
+app.get("/", (req, res) => {
+  res.send("Backend Quiz API is running ✅");
 });
 
-io.on("connection", (socket) => {
-  console.log("🟢 Un joueur connecté :", socket.id);
-
-  socket.on("join_room", (room) => {
-    socket.join(room);
-    console.log(`👥 Joueur ${socket.id} rejoint la salle ${room}`);
-  });
-
-  socket.on("send_answer", (data) => {
-    io.to(data.room).emit("receive_answer", data);
-  });
-
-  socket.on("disconnect", () => console.log("🔴 Déconnexion :", socket.id));
+// ✅ Route pour récupérer toutes les questions
+app.get("/questions", async (req, res) => {
+  try {
+    const questions = await prisma.question.findMany();
+    res.json(questions);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Erreur lors de la récupération des questions" });
+  }
 });
 
-app.get("/", (_, res) => res.send("QuizMaster API OK ✅"));
+// ✅ (Optionnel) Ajouter une route pour créer une question
+app.post("/questions", async (req, res) => {
+  try {
+    const { question, answers, correct, theme, difficulty, language } = req.body;
 
-const PORT = process.env.PORT || 4000;
-server.listen(PORT, () => console.log(`🚀 Serveur lancé sur http://localhost:${PORT}`));
+    const newQuestion = await prisma.question.create({
+      data: { question, answers, correct, theme, difficulty, language },
+    });
+
+    res.status(201).json(newQuestion);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Erreur lors de la création de la question" });
+  }
+});
+
+// ✅ Démarrage du serveur
+const PORT = 4000;
+app.listen(PORT, () => console.log(`🚀 Backend running on http://localhost:${PORT}`));
